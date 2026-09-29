@@ -1,0 +1,133 @@
+---
+- name: Update apt cache and upgrade all packages
+  apt:
+    update_cache: yes
+    upgrade: dist
+  become: yes
+  tags: [system, apt]
+
+- name: Install system packages
+  apt:
+    name: "{{ system_packages }}"
+    state: present
+  become: yes
+  tags: [system, packages]
+
+- name: Create project directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: ubuntu
+    group: ubuntu
+  loop:
+    - "{{ project_dir }}"
+    - "{{ data_dir }}"
+    - "{{ logs_dir }}"
+    - "{{ config_dir }}"
+    - "{{ project_dir }}/scripts"
+  become: yes
+  tags: [system, directories]
+
+- name: Ensure ubuntu user owns project directory recursively
+  file:
+    path: "{{ project_dir }}"
+    owner: ubuntu
+    group: ubuntu
+    recurse: yes
+  become: yes
+  tags: [system, directories, permissions]
+
+- name: Copy health check script
+  copy:
+    src: "{{ playbook_dir }}/../../scripts/health_check.sh"
+    dest: /opt/supply-chain/scripts/health_check.sh
+    mode: '0755'
+    owner: ubuntu
+    group: ubuntu
+  become: yes
+  tags: [application, scripts]
+
+- name: Set timezone to UTC
+  command: timedatectl set-timezone UTC
+  become: yes
+  changed_when: false
+  tags: [system, timezone]
+
+- name: Configure journald
+  lineinfile:
+    path: /etc/systemd/journald.conf
+    regexp: '^#?SystemMaxUse='
+    line: 'SystemMaxUse=500M'
+  become: yes
+  notify: restart journald
+  tags: [system, logging]
+
+- name: Restart journald immediately
+  systemd:
+    name: systemd-journald
+    state: restarted
+  become: yes
+  tags: [system, logging]
+
+- name: Ensure Docker service is started and enabled
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+  become: yes
+  tags: [system, docker]
+
+- name: Add ubuntu user to docker group
+  user:
+    name: ubuntu
+    groups: docker
+    append: yes
+  become: yes
+  tags: [system, docker, users]
+
+- name: Install Python packages
+  pip:
+    name: "{{ python_packages }}"
+    executable: pip3
+  become: yes
+  tags: [system, python]
+
+- name: Create health check systemd service
+  copy:
+    dest: /etc/systemd/system/supply-chain-health.service
+    content: |
+      [Unit]
+      Description=Supply Chain Digital Twin Health Check
+
+      [Service]
+      Type=oneshot
+      ExecStart=/opt/supply-chain/scripts/health_check.sh
+      User=ubuntu
+  become: yes
+  tags: [system, health_check]
+
+- name: Create health check systemd timer
+  copy:
+    dest: /etc/systemd/system/supply-chain-health.timer
+    content: |
+      [Unit]
+      Description=Run Supply Chain Digital Twin Health Check every 5 minutes
+
+      [Timer]
+      OnBootSec=5min
+      OnUnitActiveSec=5min
+
+      [Install]
+      WantedBy=timers.target
+  become: yes
+  tags: [system, health_check]
+
+- name: Enable and start health check timer
+  systemd:
+    name: supply-chain-health.timer
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  become: yes
+  tags: [system, health_check]

@@ -1,0 +1,57 @@
+---
+- name: Configure Supply Chain Digital Twin EC2 Instance
+  hosts: supply_chain_servers
+  become: yes
+  gather_facts: yes
+
+  pre_tasks:
+    - name: Display system information
+      debug:
+        msg: |
+          Hostname: {{ ansible_hostname }}
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Architecture: {{ ansible_architecture }}
+          CPUs: {{ ansible_processor_vcpus }}
+          Memory: {{ ansible_memtotal_mb }} MB
+          Python: {{ ansible_python_version }}
+
+    - name: Wait for apt lock to be released
+      shell: while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done
+      changed_when: false
+
+  roles:
+    - common
+
+  post_tasks:
+    - name: Verify Docker installation
+      command: docker --version
+      register: docker_version
+      changed_when: false
+
+    - name: Display Docker version
+      debug:
+        var: docker_version.stdout
+
+    - name: Verify project directories
+      stat:
+        path: "{{ item }}"
+      loop:
+        - "{{ project_dir }}"
+        - "{{ data_dir }}"
+        - "{{ logs_dir }}"
+        - "{{ config_dir }}"
+      register: dir_check
+
+    - name: Display directory verification
+      debug:
+        msg: "{{ item.item }} exists: {{ item.stat.exists }}"
+      loop: "{{ dir_check.results }}"
+
+    - name: Run health check
+      command: /opt/supply-chain/scripts/health_check.sh
+      register: health_output
+      changed_when: false
+
+    - name: Display health check output
+      debug:
+        var: health_output.stdout_lines

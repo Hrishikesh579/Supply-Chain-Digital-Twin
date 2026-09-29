@@ -1,0 +1,7 @@
+# Override these values with your own
+aws_region     = "us-east-1"
+project_name   = "supply-chain-dt"
+instance_type  = "t2.micro"
+
+# IMPORTANT: Change this to a globally unique name
+s3_bucket_name = "supply-chain-dt-data-CHANGE-ME"

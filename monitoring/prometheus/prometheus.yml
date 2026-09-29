@@ -1,0 +1,58 @@
+# Supply Chain Digital Twin - Prometheus Configuration
+# Review 1: Basic scrape configuration
+# Review 2: Add application metrics
+# Review 3: Add Kubernetes service discovery
+# Review 4: Add Jenkins metrics
+# Review 5: Add ML model metrics and drift scores
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+  external_labels:
+    project: 'supply-chain-dt'
+    environment: 'development'
+    review: '1'
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          instance: 'prometheus-server'
+
+  # Node Exporter - System metrics (CPU, Memory, Disk, Network)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['localhost:9100']
+        labels:
+          instance: 'ec2-main'
+
+  # Docker containers metrics (cAdvisor)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['localhost:8081']
+        labels:
+          instance: 'ec2-main'
+
+  # Supply Chain Flask App
+  - job_name: 'supply-chain-api'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['localhost:5000']
+        labels:
+          service: 'flask-api'
+
+  # Spring Boot Actuator (future)
+  # - job_name: 'spring-boot-api'
+  #   metrics_path: '/actuator/prometheus'
+  #   static_configs:
+  #     - targets: ['localhost:8080']
+
+  # Jenkins (future)
+  # - job_name: 'jenkins'
+  #   metrics_path: '/prometheus'
+  #   static_configs:
+  #     - targets: ['localhost:8080']

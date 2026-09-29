@@ -1,0 +1,83 @@
+// Supply Chain Digital Twin - CI/CD Pipeline
+// Review 1: Basic pipeline skeleton
+// Review 2: Add build stages for Maven and Gradle
+// Review 3: Add Docker build and push
+// Review 4: Full CI/CD with testing and deployment
+// Review 5: Production pipeline with canary deployment
+
+pipeline {
+    agent any
+
+    environment {
+        PROJECT_NAME = 'supply-chain-dt'
+        DOCKER_IMAGE = 'supply-chain-dt-api'
+        DOCKER_TAG   = "${BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Checking out source code...'
+                checkout scm
+            }
+        }
+
+        stage('Build Backend (Maven)') {
+            steps {
+                echo 'Building Spring Boot backend with Maven...'
+                dir('application/backend') {
+                    sh 'mvn clean package -DskipTests'
+                }
+            }
+        }
+
+        stage('Build Simulator (Gradle)') {
+            steps {
+                echo 'Building Simulator with Gradle...'
+                dir('application/simulator') {
+                    sh 'gradle clean build -x test'
+                }
+            }
+        }
+
+        stage('Test') {
+            steps {
+                echo 'Running tests...'
+                dir('application/backend') {
+                    sh 'mvn test'
+                }
+                dir('application/simulator') {
+                    sh 'gradle test'
+                }
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                echo 'Building Docker image...'
+                dir('docker') {
+                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
+                    sh "docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest"
+                }
+            }
+        }
+
+        // Future stages (Review 2+)
+        // stage('Push to Artifactory') { }
+        // stage('Deploy to Kubernetes') { }
+        // stage('Integration Tests') { }
+        // stage('Canary Deployment') { }
+    }
+
+    post {
+        always {
+            echo 'Pipeline completed.'
+        }
+        success {
+            echo 'Build succeeded!'
+        }
+        failure {
+            echo 'Build failed!'
+        }
+    }
+}

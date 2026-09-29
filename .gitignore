@@ -1,0 +1,57 @@
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+*.tfvars
+!terraform.tfvars.example
+
+# Keys and credentials
+keys/
+*.pem
+*.key
+*.pub
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+
+# Java / Maven
+target/
+*.jar
+*.war
+*.class
+
+# Gradle
+.gradle/
+build/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+venv/
+.venv/
+
+# Docker
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+*.env.local
+
+# Logs
+logs/
+*.log
+
+# Ansible
+*.retry
