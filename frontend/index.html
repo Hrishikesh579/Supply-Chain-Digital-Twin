@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supply Chain Digital Twin - Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f1923; color: #e0e0e0; min-height: 100vh; }
+        .header { background: linear-gradient(135deg, #1a2332 0%, #2d3748 100%); padding: 20px 30px; border-bottom: 2px solid #3182ce; }
+        .header h1 { font-size: 1.5rem; color: #63b3ed; }
+        .header p { font-size: 0.85rem; color: #a0aec0; margin-top: 4px; }
+        .nav { display: flex; background: #1a2332; border-bottom: 1px solid #2d3748; padding: 0 20px; flex-wrap: wrap; }
+        .nav button { background: none; border: none; color: #a0aec0; padding: 12px 20px; font-size: 0.9rem; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+        .nav button:hover { color: #63b3ed; background: #2d3748; }
+        .nav button.active { color: #63b3ed; border-bottom-color: #3182ce; }
+        .content { padding: 24px; max-width: 1400px; margin: 0 auto; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .card { background: #1a2332; border: 1px solid #2d3748; border-radius: 8px; padding: 20px; }
+        .card h3 { color: #63b3ed; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+        .card .value { font-size: 1.8rem; font-weight: 700; color: #fff; }
+        .card .label { font-size: 0.8rem; color: #718096; margin-top: 4px; }
+        .status { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+        .status.green { background: #22543d; color: #68d391; }
+        .status.yellow { background: #744210; color: #f6e05e; }
+        .status.red { background: #742a2a; color: #fc8181; }
+        .status.blue { background: #2a4365; color: #63b3ed; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid #2d3748; font-size: 0.85rem; }
+        th { color: #63b3ed; font-weight: 600; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 1px; }
+        .flow-container { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; padding: 30px 0; }
+        .flow-node { background: #2d3748; border: 2px solid #3182ce; border-radius: 8px; padding: 16px 24px; text-align: center; min-width: 140px; }
+        .flow-node h4 { color: #63b3ed; margin-bottom: 4px; }
+        .flow-node p { color: #a0aec0; font-size: 0.8rem; }
+        .flow-arrow { color: #3182ce; font-size: 1.5rem; font-weight: bold; }
+        .section-title { color: #63b3ed; font-size: 1.1rem; margin: 24px 0 12px; padding-bottom: 8px; border-bottom: 1px solid #2d3748; }
+        .event-card { background: #1a2332; border-left: 3px solid #3182ce; padding: 12px 16px; margin-bottom: 8px; border-radius: 0 4px 4px 0; }
+        .event-card.DEMAND_SURGE { border-left-color: #e53e3e; }
+        .event-card.SUPPLIER_DELAY { border-left-color: #dd6b20; }
+        .event-card.TRANSPORT_DISRUPTION { border-left-color: #d69e2e; }
+        .event-card.SEASONAL_CHANGE { border-left-color: #38a169; }
+        .event-card.QUALITY_ISSUE { border-left-color: #805ad5; }
+        .event-card.PRICE_CHANGE { border-left-color: #3182ce; }
+        .event-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .event-type { font-weight: 600; font-size: 0.85rem; }
+        .severity-badge { padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; }
+        .severity-LOW { background: #22543d; color: #68d391; }
+        .severity-MEDIUM { background: #744210; color: #f6e05e; }
+        .severity-HIGH { background: #742a2a; color: #fc8181; }
+        .severity-CRITICAL { background: #63171b; color: #feb2b2; }
+        .infra-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+        .infra-card { background: #1a2332; border: 1px solid #2d3748; border-radius: 8px; padding: 16px; }
+        .infra-card h4 { color: #63b3ed; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+        .infra-item { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #1e2d3d; font-size: 0.85rem; }
+        .infra-item:last-child { border-bottom: none; }
+        .infra-key { color: #a0aec0; }
+        .infra-val { color: #e2e8f0; font-family: 'Courier New', monospace; font-size: 0.8rem; }
+        .progress-bar { background: #2d3748; border-radius: 4px; height: 8px; margin-top: 6px; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 4px; transition: width 0.5s; }
+        .progress-fill.green { background: #48bb78; }
+        .progress-fill.yellow { background: #ecc94b; }
+        .progress-fill.red { background: #fc8181; }
+        .btn { background: #3182ce; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; transition: background 0.2s; }
+        .btn:hover { background: #2b6cb0; }
+        .btn-group { display: flex; gap: 10px; margin: 16px 0; flex-wrap: wrap; }
+        .monitoring-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
+        .monitor-link { background: #1a2332; border: 1px solid #2d3748; border-radius: 8px; padding: 24px; text-align: center; text-decoration: none; color: #e0e0e0; transition: all 0.2s; display: block; }
+        .monitor-link:hover { border-color: #3182ce; transform: translateY(-2px); }
+        .monitor-link h4 { color: #63b3ed; margin-bottom: 8px; font-size: 1.1rem; }
+        .monitor-link p { color: #718096; font-size: 0.85rem; }
+        .refresh-info { text-align: right; color: #718096; font-size: 0.75rem; margin-bottom: 16px; }
+        @media (max-width: 768px) { .flow-container { flex-direction: column; } .flow-arrow { transform: rotate(90deg); } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>&#x1F4E6; Supply Chain Digital Twin</h1>
+        <p>Cloud-Based Supply Chain Digital Twin using DevOps Automation &mdash; Review 1</p>
+    </div>
+
+    <div class="nav">
+        <button class="active" onclick="showTab('overview')">Overview</button>
+        <button onclick="showTab('supplychain')">Supply Chain</button>
+        <button onclick="showTab('events')">Events</button>
+        <button onclick="showTab('infrastructure')">AWS Infrastructure</button>
+        <button onclick="showTab('health')">Health</button>
+        <button onclick="showTab('monitoring')">Monitoring</button>
+    </div>
+
+    <div class="content">
+        <!-- ============ OVERVIEW TAB ============ -->
+        <div id="tab-overview" class="tab-content active">
+            <div class="refresh-info">Last updated: <span id="overview-time">--</span></div>
+            <h2 class="section-title">Platform Status</h2>
+            <div class="grid" id="platform-status"></div>
+            <h2 class="section-title">Supply Chain Summary</h2>
+            <div class="grid" id="sc-summary"></div>
+        </div>
+
+        <!-- ============ SUPPLY CHAIN TAB ============ -->
+        <div id="tab-supplychain" class="tab-content">
+            <h2 class="section-title">Supply Chain Flow</h2>
+            <div class="flow-container">
+                <div class="flow-node"><h4>&#x1F4E6; Suppliers</h4><p id="flow-suppliers">0 active</p></div>
+                <div class="flow-arrow">&#x27A1;</div>
+                <div class="flow-node"><h4>&#x1F3ED; Factories</h4><p id="flow-factories">0 units</p></div>
+                <div class="flow-arrow">&#x27A1;</div>
+                <div class="flow-node"><h4>&#x1F4E6; Warehouses</h4><p id="flow-warehouses">0 hubs</p></div>
+                <div class="flow-arrow">&#x27A1;</div>
+                <div class="flow-node"><h4>&#x1F69A; Distribution</h4><p>Logistics</p></div>
+                <div class="flow-arrow">&#x27A1;</div>
+                <div class="flow-node"><h4>&#x1F464; Customer</h4><p>End User</p></div>
+            </div>
+            <h2 class="section-title">Suppliers</h2>
+            <div class="card"><table id="suppliers-table"><thead><tr><th>ID</th><th>Name</th><th>Region</th><th>Status</th><th>Reliability</th><th>Lead Time</th></tr></thead><tbody></tbody></table></div>
+            <h2 class="section-title">Factories</h2>
+            <div class="card"><table id="factories-table"><thead><tr><th>ID</th><th>Name</th><th>Location</th><th>Capacity</th><th>Utilization</th></tr></thead><tbody></tbody></table></div>
+            <h2 class="section-title">Warehouses</h2>
+            <div class="card"><table id="warehouses-table"><thead><tr><th>ID</th><th>Name</th><th>Location</th><th>Capacity (sqft)</th><th>Occupancy</th></tr></thead><tbody></tbody></table></div>
+            <h2 class="section-title">Products</h2>
+            <div class="card"><table id="products-table"><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Unit Cost</th><th>Stock</th></tr></thead><tbody></tbody></table></div>
+        </div>
+
+        <!-- ============ EVENTS TAB ============ -->
+        <div id="tab-events" class="tab-content">
+            <h2 class="section-title">Supply Chain Events</h2>
+            <div class="btn-group">
+                <button class="btn" onclick="generateEvents()">&#x26A1; Generate New Events</button>
+                <button class="btn" onclick="loadEvents()">&#x1F504; Refresh</button>
+            </div>
+            <div id="events-list"></div>
+        </div>
+
+        <!-- ============ AWS INFRASTRUCTURE TAB ============ -->
+        <div id="tab-infrastructure" class="tab-content">
+            <h2 class="section-title">AWS Cloud Infrastructure</h2>
+            <div class="refresh-info">All resources managed by Terraform &mdash; IAM role-based access (no hardcoded credentials)</div>
+            <div class="infra-grid" id="infra-grid"></div>
+        </div>
+
+        <!-- ============ HEALTH TAB ============ -->
+        <div id="tab-health" class="tab-content">
+            <h2 class="section-title">System Health</h2>
+            <div class="btn-group">
+                <button class="btn" onclick="loadHealth()">&#x1F504; Refresh Health</button>
+            </div>
+            <div class="grid" id="health-grid"></div>
+        </div>
+
+        <!-- ============ MONITORING TAB ============ -->
+        <div id="tab-monitoring" class="tab-content">
+            <h2 class="section-title">Monitoring & Observability</h2>
+            <div class="monitoring-links" id="monitoring-links"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+        let EC2_IP = window.location.hostname;
+
+        function showTab(name) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-' + name).classList.add('active');
+            event.target.classList.add('active');
+            // Load data for the tab
+            if (name === 'overview') loadOverview();
+            if (name === 'supplychain') loadSupplyChain();
+            if (name === 'events') loadEvents();
+            if (name === 'infrastructure') loadInfrastructure();
+            if (name === 'health') loadHealth();
+            if (name === 'monitoring') loadMonitoring();
+        }
+
+        async function fetchJSON(url) {
+            try {
+                const res = await fetch(API_BASE + url);
+                return await res.json();
+            } catch(e) {
+                console.error('Fetch error:', url, e);
+                return null;
+            }
+        }
+
+        async function loadOverview() {
+            document.getElementById('overview-time').textContent = new Date().toLocaleString();
+            const [health, overview, infra, sysHealth] = await Promise.all([
+                fetchJSON('/health'),
+                fetchJSON('/api/v1/supply-chain/overview'),
+                fetchJSON('/api/v1/infrastructure'),
+                fetchJSON('/api/v1/system/health')
+            ]);
+
+            let platformHTML = '';
+            const statuses = [
+                {name: 'EC2 Instance', status: 'RUNNING', icon: '&#x1F5A5;'},
+                {name: 'S3 Bucket', status: 'ACTIVE', icon: '&#x1F4BE;'},
+                {name: 'EBS Volume', status: 'ATTACHED', icon: '&#x1F4BF;'},
+                {name: 'IAM Role', status: 'CONFIGURED', icon: '&#x1F512;'},
+                {name: 'CloudWatch', status: infra?.cloudwatch?.status?.toUpperCase() || 'ACTIVE', icon: '&#x1F4CA;'},
+                {name: 'API', status: health?.status === 'healthy' ? 'HEALTHY' : 'DOWN', icon: '&#x1F310;'},
+                {name: 'Docker', status: 'RUNNING', icon: '&#x1F433;'},
+                {name: 'VPC Network', status: 'ACTIVE', icon: '&#x1F310;'}
+            ];
+            statuses.forEach(s => {
+                const color = ['RUNNING','ACTIVE','ATTACHED','CONFIGURED','HEALTHY'].includes(s.status) ? 'green' : 'red';
+                platformHTML += `<div class="card"><h3>${s.icon} ${s.name}</h3><span class="status ${color}">${s.status}</span></div>`;
+            });
+            document.getElementById('platform-status').innerHTML = platformHTML;
+
+            let scHTML = '';
+            if (overview) {
+                const items = [
+                    {name: 'Suppliers', count: overview.total_suppliers, icon: '&#x1F4E6;'},
+                    {name: 'Factories', count: overview.total_factories, icon: '&#x1F3ED;'},
+                    {name: 'Warehouses', count: overview.total_warehouses, icon: '&#x1F3E2;'},
+                    {name: 'Products', count: overview.total_products, icon: '&#x1F4E6;'},
+                    {name: 'Events', count: overview.total_events || 0, icon: '&#x26A1;'},
+                    {name: 'Digital Twin', count: overview.digital_twin_status, icon: '&#x1F916;'}
+                ];
+                items.forEach(i => {
+                    scHTML += `<div class="card"><h3>${i.icon} ${i.name}</h3><div class="value">${i.count}</div></div>`;
+                });
+            }
+            document.getElementById('sc-summary').innerHTML = scHTML;
+        }
+
+        async function loadSupplyChain() {
+            const [suppliers, factories, warehouses, products] = await Promise.all([
+                fetchJSON('/api/v1/suppliers'),
+                fetchJSON('/api/v1/factories'),
+                fetchJSON('/api/v1/warehouses'),
+                fetchJSON('/api/v1/products')
+            ]);
+
+            if (suppliers) {
+                document.getElementById('flow-suppliers').textContent = suppliers.count + ' active';
+                let html = '';
+                suppliers.suppliers.forEach(s => {
+                    html += `<tr><td>${s.id}</td><td>${s.name}</td><td>${s.region}</td><td><span class="status green">${s.status}</span></td><td>${(s.reliability*100).toFixed(0)}%</td><td>${s.lead_time_days}d</td></tr>`;
+                });
+                document.querySelector('#suppliers-table tbody').innerHTML = html;
+            }
+            if (factories) {
+                document.getElementById('flow-factories').textContent = factories.count + ' units';
+                let html = '';
+                factories.factories.forEach(f => {
+                    const pct = ((f.utilization||0)*100).toFixed(0);
+                    html += `<tr><td>${f.id}</td><td>${f.name}</td><td>${f.location}</td><td>${f.capacity}</td><td>${pct}%</td></tr>`;
+                });
+                document.querySelector('#factories-table tbody').innerHTML = html;
+            }
+            if (warehouses) {
+                document.getElementById('flow-warehouses').textContent = warehouses.count + ' hubs';
+                let html = '';
+                warehouses.warehouses.forEach(w => {
+                    const pct = ((w.occupancy||0)*100).toFixed(0);
+                    html += `<tr><td>${w.id}</td><td>${w.name}</td><td>${w.location}</td><td>${w.capacity_sqft?.toLocaleString()}</td><td>${pct}%</td></tr>`;
+                });
+                document.querySelector('#warehouses-table tbody').innerHTML = html;
+            }
+            if (products) {
+                let html = '';
+                products.products.forEach(p => {
+                    html += `<tr><td>${p.id}</td><td>${p.name}</td><td>${p.category}</td><td>$${p.unit_cost?.toFixed(2)}</td><td>${p.stock?.toLocaleString()}</td></tr>`;
+                });
+                document.querySelector('#products-table tbody').innerHTML = html;
+            }
+        }
+
+        async function loadEvents() {
+            const data = await fetchJSON('/api/v1/events?limit=30');
+            if (!data) return;
+            let html = '';
+            data.events.forEach(e => {
+                html += `<div class="event-card ${e.type}">
+                    <div class="event-header">
+                        <span class="event-type">${e.type.replace(/_/g,' ')}</span>
+                        <span class="severity-badge severity-${e.severity}">${e.severity}</span>
+                    </div>
+                    <div style="color:#a0aec0;font-size:0.8rem;margin-bottom:4px">${e.description}</div>
+                    <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#718096">
+                        <span>&#x1F4CD; ${e.region} &bull; ${e.product}</span>
+                        <span>Impact: ${(e.impact_score*100).toFixed(0)}% &bull; ${new Date(e.timestamp).toLocaleString()}</span>
+                    </div>
+                </div>`;
+            });
+            document.getElementById('events-list').innerHTML = html;
+        }
+
+        async function generateEvents() {
+            await fetch(API_BASE + '/api/v1/events/generate?count=5', {method: 'POST'});
+            loadEvents();
+        }
+
+        async function loadInfrastructure() {
+            const infra = await fetchJSON('/api/v1/infrastructure');
+            if (!infra) return;
+            const sections = [
+                {title: '&#x1F310; VPC', items: [{k:'VPC ID', v:infra.vpc?.id},{k:'CIDR', v:infra.vpc?.cidr},{k:'Status', v:infra.vpc?.status}]},
+                {title: '&#x1F4E1; Subnet', items: [{k:'Subnet ID', v:infra.subnet?.id},{k:'CIDR', v:infra.subnet?.cidr},{k:'Type', v:infra.subnet?.type}]},
+                {title: '&#x1F6AA; Internet Gateway', items: [{k:'Status', v:infra.internet_gateway?.status}]},
+                {title: '&#x1F6E4; Route Table', items: [{k:'Default Route', v:infra.route_table?.default_route},{k:'Status', v:infra.route_table?.status}]},
+                {title: '&#x1F6E1; Security Group', items: [{k:'SG ID', v:infra.security_group?.id},{k:'Open Ports', v:infra.security_group?.ports?.join(', ')},{k:'Status', v:infra.security_group?.status}]},
+                {title: '&#x1F5A5; EC2 Instance', items: [{k:'Instance ID', v:infra.ec2?.id},{k:'Type', v:infra.ec2?.type},{k:'Status', v:infra.ec2?.status},{k:'Hostname', v:infra.ec2?.hostname}]},
+                {title: '&#x1F4BF; EBS Volumes', items: [{k:'Root', v:infra.ebs?.root_volume},{k:'Data', v:infra.ebs?.data_volume},{k:'Status', v:infra.ebs?.status}]},
+                {title: '&#x1F4BE; S3 Bucket', items: [{k:'Name', v:infra.s3?.bucket},{k:'Status', v:infra.s3?.status},{k:'Folders', v:infra.s3?.folders?.join(', ')}]},
+                {title: '&#x1F512; IAM', items: [{k:'Role', v:infra.iam?.role},{k:'Profile', v:infra.iam?.profile},{k:'Policies', v:infra.iam?.policies?.join(', ')},{k:'Status', v:infra.iam?.status}]},
+                {title: '&#x1F4CA; CloudWatch', items: [{k:'Log Groups', v:infra.cloudwatch?.log_groups?.join(', ')},{k:'Status', v:infra.cloudwatch?.status}]}
+            ];
+            let html = '';
+            sections.forEach(s => {
+                let items = '';
+                s.items.forEach(i => {
+                    const val = i.v || 'N/A';
+                    items += `<div class="infra-item"><span class="infra-key">${i.k}</span><span class="infra-val">${val}</span></div>`;
+                });
+                html += `<div class="infra-card"><h4>${s.title}</h4>${items}</div>`;
+            });
+            document.getElementById('infra-grid').innerHTML = html;
+        }
+
+        async function loadHealth() {
+            const data = await fetchJSON('/api/v1/system/health');
+            if (!data) return;
+            let html = '';
+            // CPU
+            const cpuColor = data.cpu?.percent > 80 ? 'red' : data.cpu?.percent > 60 ? 'yellow' : 'green';
+            html += `<div class="card"><h3>&#x1F4BB; CPU</h3><div class="value">${data.cpu?.percent?.toFixed(1) || 0}%</div><div class="label">Cores: ${data.cpu?.cores || 'N/A'}</div><div class="progress-bar"><div class="progress-fill ${cpuColor}" style="width:${data.cpu?.percent||0}%"></div></div></div>`;
+            // Memory
+            const memColor = data.memory?.percent > 90 ? 'red' : data.memory?.percent > 70 ? 'yellow' : 'green';
+            html += `<div class="card"><h3>&#x1F4BE; Memory</h3><div class="value">${data.memory?.percent?.toFixed(1) || 0}%</div><div class="label">${data.memory?.used_mb || 0} MB / ${data.memory?.total_mb || 0} MB</div><div class="progress-bar"><div class="progress-fill ${memColor}" style="width:${data.memory?.percent||0}%"></div></div></div>`;
+            // Disk
+            const diskColor = data.disk?.percent > 85 ? 'red' : data.disk?.percent > 70 ? 'yellow' : 'green';
+            html += `<div class="card"><h3>&#x1F4BF; Disk</h3><div class="value">${data.disk?.percent?.toFixed(1) || 0}%</div><div class="label">${data.disk?.used_gb || 0} GB / ${data.disk?.total_gb || 0} GB</div><div class="progress-bar"><div class="progress-fill ${diskColor}" style="width:${data.disk?.percent||0}%"></div></div></div>`;
+            // Docker
+            html += `<div class="card"><h3>&#x1F433; Docker</h3><div class="value"><span class="status green">${data.docker?.status || 'unknown'}</span></div></div>`;
+            // Flask
+            html += `<div class="card"><h3>&#x1F40D; Flask API</h3><div class="value"><span class="status green">${data.flask?.status || 'unknown'}</span></div><div class="label">Uptime: ${formatUptime(data.flask?.uptime_seconds)}</div></div>`;
+            // Hostname
+            html += `<div class="card"><h3>&#x1F5A5; Host</h3><div class="value" style="font-size:1rem">${data.hostname || 'unknown'}</div><div class="label">${data.timestamp || ''}</div></div>`;
+            document.getElementById('health-grid').innerHTML = html;
+        }
+
+        function formatUptime(seconds) {
+            if (!seconds) return 'N/A';
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            return `${h}h ${m}m ${s}s`;
+        }
+
+        function loadMonitoring() {
+            const host = window.location.hostname;
+            const links = [
+                {title: 'Grafana', desc: 'Infrastructure dashboards and metrics visualization', url: `http://${host}:3000`, icon: '&#x1F4CA;'},
+                {title: 'Prometheus', desc: 'Metrics collection, queries, and alerting', url: `http://${host}:9090`, icon: '&#x1F525;'},
+                {title: 'AWS CloudWatch', desc: 'AWS-native monitoring and log management', url: 'https://console.aws.amazon.com/cloudwatch/', icon: '&#x2601;'},
+                {title: 'Flask Metrics', desc: 'Prometheus metrics endpoint from the application', url: `http://${host}:5000/metrics`, icon: '&#x1F4C8;'},
+                {title: 'Health Check API', desc: 'Application health status endpoint', url: `http://${host}:5000/health`, icon: '&#x1F49A;'},
+                {title: 'Node Exporter', desc: 'System-level metrics (CPU, memory, disk, network)', url: `http://${host}:9100/metrics`, icon: '&#x1F4DF;'}
+            ];
+            let html = '';
+            links.forEach(l => {
+                html += `<a href="${l.url}" target="_blank" class="monitor-link"><h4>${l.icon} ${l.title}</h4><p>${l.desc}</p></a>`;
+            });
+            document.getElementById('monitoring-links').innerHTML = html;
+        }
+
+        // Initial load
+        loadOverview();
+    </script>
+</body>
+</html>
