@@ -26,6 +26,9 @@
     - "{{ logs_dir }}"
     - "{{ config_dir }}"
     - "{{ project_dir }}/scripts"
+    - "{{ project_dir }}/docker"
+    - "{{ project_dir }}/docker/static"
+    - "{{ project_dir }}/monitoring"
   become: yes
   tags: [system, directories]
 
@@ -93,6 +96,133 @@
   become: yes
   tags: [system, python]
 
+# ---- CloudWatch Agent ----
+- name: Download CloudWatch Agent
+  get_url:
+    url: https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+    dest: /tmp/amazon-cloudwatch-agent.deb
+  become: yes
+  tags: [monitoring, cloudwatch]
+
+- name: Install CloudWatch Agent
+  apt:
+    deb: /tmp/amazon-cloudwatch-agent.deb
+  become: yes
+  tags: [monitoring, cloudwatch]
+
+- name: Create CloudWatch Agent configuration
+  copy:
+    dest: /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+    content: |
+      {
+        "agent": {
+          "metrics_collection_interval": 60,
+          "run_as_user": "root"
+        },
+        "logs": {
+          "logs_collected": {
+            "files": {
+              "collect_list": [
+                {
+                  "file_path": "/opt/supply-chain/logs/health_check.log",
+                  "log_group_name": "/supply-chain-dt/application",
+                  "log_stream_name": "health-check-{instance_id}",
+                  "timezone": "UTC"
+                },
+                {
+                  "file_path": "/var/log/syslog",
+                  "log_group_name": "/supply-chain-dt/system",
+                  "log_stream_name": "syslog-{instance_id}",
+                  "timezone": "UTC"
+                }
+              ]
+            }
+          }
+        },
+        "metrics": {
+          "namespace": "SupplyChainDT",
+          "metrics_collected": {
+            "cpu": {
+              "measurement": ["cpu_usage_idle", "cpu_usage_user", "cpu_usage_system"],
+              "metrics_collection_interval": 60,
+              "totalcpu": true
+            },
+            "mem": {
+              "measurement": ["mem_used_percent"],
+              "metrics_collection_interval": 60
+            },
+            "disk": {
+              "measurement": ["used_percent"],
+              "metrics_collection_interval": 60,
+              "resources": ["*"]
+            }
+          }
+        }
+      }
+    mode: '0644'
+  become: yes
+  tags: [monitoring, cloudwatch]
+
+- name: Start CloudWatch Agent
+  shell: |
+    /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+      -a fetch-config \
+      -m ec2 \
+      -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json \
+      -s
+  become: yes
+  changed_when: true
+  tags: [monitoring, cloudwatch]
+
+# ---- S3 Data Upload ----
+- name: Create supply chain sample data file
+  copy:
+    dest: /opt/supply-chain/data/supply_chain_config.json
+    content: |
+      {
+        "project": "Supply Chain Digital Twin",
+        "version": "0.1.0",
+        "review": 1,
+        "created": "{{ ansible_date_time.iso8601 }}",
+        "suppliers": [
+          {"id": 1, "name": "RawMat Corp", "region": "Asia Pacific"},
+          {"id": 2, "name": "Steel Works Ltd", "region": "Europe"},
+          {"id": 3, "name": "ChemSupply Inc", "region": "North America"}
+        ],
+        "factories": [
+          {"id": 1, "name": "Assembly Plant A", "location": "Shanghai"},
+          {"id": 2, "name": "Processing Unit B", "location": "Detroit"}
+        ],
+        "warehouses": [
+          {"id": 1, "name": "Central Warehouse", "location": "Chicago"},
+          {"id": 2, "name": "East Coast Hub", "location": "New Jersey"}
+        ]
+      }
+    owner: ubuntu
+    group: ubuntu
+    mode: '0644'
+  become: yes
+  tags: [application, data]
+
+- name: Upload configuration to S3
+  shell: |
+    aws s3 cp /opt/supply-chain/data/supply_chain_config.json \
+      s3://{{ s3_bucket }}/configs/supply_chain_config.json
+  become: no
+  become_user: ubuntu
+  ignore_errors: yes
+  tags: [application, s3]
+
+- name: Upload health check script to S3
+  shell: |
+    aws s3 cp /opt/supply-chain/scripts/health_check.sh \
+      s3://{{ s3_bucket }}/configs/health_check.sh
+  become: no
+  become_user: ubuntu
+  ignore_errors: yes
+  tags: [application, s3]
+
+# ---- Health Check Timer ----
 - name: Create health check systemd service
   copy:
     dest: /etc/systemd/system/supply-chain-health.service

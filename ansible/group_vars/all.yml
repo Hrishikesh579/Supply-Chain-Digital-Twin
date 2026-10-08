@@ -6,11 +6,13 @@ logs_dir: /opt/supply-chain/logs
 config_dir: /opt/supply-chain/config
 docker_compose_version: "2.24.0"
 node_exporter_version: "1.7.0"
+s3_bucket: supply-chain-dt-hrishikesh-2026
 python_packages:
   - flask
   - boto3
   - requests
   - prometheus-client
+  - psutil
 system_packages:
   - docker.io
   - docker-compose
@@ -25,3 +27,4 @@ system_packages:
   - python3-venv
   - awscli
   - net-tools
+  - bc

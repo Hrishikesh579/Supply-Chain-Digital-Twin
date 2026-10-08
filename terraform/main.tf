@@ -129,7 +129,7 @@ resource "aws_security_group" "allow_web" {
     from_port   = 8080
     to_port     = 8080
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.allowed_ssh_cidr]
   }
 
   ingress {
@@ -137,7 +137,7 @@ resource "aws_security_group" "allow_web" {
     from_port   = 9090
     to_port     = 9090
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.allowed_ssh_cidr]
   }
 
   ingress {
@@ -145,7 +145,7 @@ resource "aws_security_group" "allow_web" {
     from_port   = 3000
     to_port     = 3000
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.allowed_ssh_cidr]
   }
 
   egress {
@@ -208,9 +208,24 @@ resource "aws_iam_policy" "ec2_policy" {
       {
         Action = [
           "cloudwatch:PutMetricData",
+          "cloudwatch:GetMetricData",
+          "cloudwatch:ListMetrics",
           "logs:CreateLogStream",
           "logs:PutLogEvents",
-          "logs:CreateLogGroup"
+          "logs:CreateLogGroup",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams",
+          "logs:GetLogEvents",
+          "logs:PutRetentionPolicy"
+        ]
+        Effect   = "Allow"
+        Resource = "*"
+      },
+      {
+        Action = [
+          "ec2:DescribeInstances",
+          "ec2:DescribeVolumes",
+          "ec2:DescribeTags"
         ]
         Effect   = "Allow"
         Resource = "*"
@@ -223,6 +238,18 @@ resource "aws_iam_policy" "ec2_policy" {
 resource "aws_iam_role_policy_attachment" "ec2_attach" {
   role       = aws_iam_role.ec2_role.name
   policy_arn = aws_iam_policy.ec2_policy.arn
+}
+
+# n2) CloudWatch Agent Managed Policy
+resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
+# n3) SSM Managed Instance Core (required by CloudWatch Agent)
+resource "aws_iam_role_policy_attachment" "ssm_core" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
 # o) IAM Instance Profile
@@ -239,6 +266,7 @@ resource "aws_instance" "app_server" {
   vpc_security_group_ids = [aws_security_group.allow_web.id]
   key_name               = aws_key_pair.generated_key.key_name
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
+  monitoring             = true
 
   root_block_device {
     volume_size = 10
