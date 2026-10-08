@@ -55,3 +55,6 @@ logs/
 # Ansible
 *.retry
 ansible/inventory/hosts.local.ini
+
+# Recovery Code
+recovery-codes.txt
